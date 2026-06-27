@@ -1051,6 +1051,18 @@ def export(df, etf_df, tags):
     grade_counts = df["grade"].value_counts().to_dict()
 
     df = df.replace([np.nan, np.inf, -np.inf], None)
+    if not etf_df.empty:
+        etf_df = etf_df.replace([np.nan, np.inf, -np.inf], None)
+
+    def sanitize(obj):
+        """Recursively replace float NaN/Inf with None so JSON is always valid."""
+        if isinstance(obj, float) and (obj != obj or obj == float("inf") or obj == float("-inf")):
+            return None
+        if isinstance(obj, dict):
+            return {k: sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [sanitize(v) for v in obj]
+        return obj
 
     payload = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
@@ -1061,16 +1073,18 @@ def export(df, etf_df, tags):
         "grade_breakdown": {str(k): v for k, v in grade_counts.items()},
         "avg_score": round(float(df["momentum_score"].mean()), 1),
         "pct_above_ma200": round(float(df["above_ma200"].mean() * 100), 1),
-        "stocks": json.loads(df.to_json(orient="records").replace(":NaN,", ":null,").replace(":NaN}", ":null}")),
-        "etfs":   json.loads(etf_df.to_json(orient="records").replace(":NaN,", ":null,").replace(":NaN}", ":null}")),
+        "stocks": json.loads(df.to_json(orient="records").replace(":NaN,", ":null,").replace(":NaN}", ":null}").replace(":NaN]", ":null]")),
+        "etfs":   json.loads(etf_df.to_json(orient="records").replace(":NaN,", ":null,").replace(":NaN}", ":null}").replace(":NaN]", ":null]")),
         "etf_avg_score":          round(float(etf_df["momentum_score"].mean()), 1) if not etf_df.empty else 0,
         "etf_pct_above_ma200":    round(float(etf_df["above_ma200"].mean() * 100), 1) if not etf_df.empty else 0,
         "etf_grade_breakdown":    {str(k): v for k, v in etf_df["grade"].value_counts().to_dict().items()} if not etf_df.empty else {},
         "etf_category_breakdown": etf_df["sector"].value_counts().to_dict() if not etf_df.empty else {},
     }
 
+    payload = sanitize(payload)
+
     with open("data.json", "w") as f:
-        json.dump(payload, f, indent=2, default=str)
+        json.dump(payload, f, indent=2)
 
     log.info("Saved → data.json")
 
