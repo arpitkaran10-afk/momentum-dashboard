@@ -1950,7 +1950,7 @@ async function load(){
     }
   });
   } catch(err) {
-    log && log.error ? log.error(err) : console.error(err);
+    console.error(err);
     document.getElementById("tbody").innerHTML=
       `<tr><td colspan="30"><div class="empty-state">⚠️ Failed to load data.json. Run the pipeline first, then refresh.<br><small style="color:var(--muted)">${err.message}</small></div></td></tr>`;
   }
