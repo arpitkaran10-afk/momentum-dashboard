@@ -934,6 +934,39 @@ def add_groq_summaries(df, api_key):
     return df
 
 
+def enrich_metadata(df):
+    """
+    Fill full_name, description, sub_sector for any ticker missing them,
+    by fetching yfinance .info. Only fetches tickers that need it.
+    """
+    missing = df[
+        df["full_name"].eq("") | df["description"].eq("") | df["sub_sector"].eq("")
+    ]["ticker"].tolist()
+
+    if not missing:
+        return df
+
+    log.info(f"Fetching metadata from yfinance for {len(missing)} tickers: {missing}")
+    for ticker in missing:
+        try:
+            info = yf.Ticker(ticker).info
+            if df.loc[df["ticker"] == ticker, "full_name"].values[0] == "":
+                df.loc[df["ticker"] == ticker, "full_name"] = info.get("longName", "")
+            if df.loc[df["ticker"] == ticker, "description"].values[0] == "":
+                summary = info.get("longBusinessSummary", "")
+                # Trim to ~200 chars at a sentence boundary
+                if len(summary) > 200:
+                    cut = summary[:200].rfind(". ")
+                    summary = summary[:cut + 1] if cut > 100 else summary[:200]
+                df.loc[df["ticker"] == ticker, "description"] = summary
+            if df.loc[df["ticker"] == ticker, "sub_sector"].values[0] == "":
+                df.loc[df["ticker"] == ticker, "sub_sector"] = info.get("industry", "")
+        except Exception as e:
+            log.warning(f"Metadata fetch failed for {ticker}: {e}")
+
+    return df
+
+
 def push_to_github(local_path, token, repo, branch="main", dest_path=None):
     """
     Push any local file to GitHub Pages using the GitHub REST API.
@@ -1005,12 +1038,14 @@ def export(df, etf_df, tags):
     df["full_name"]   = df["ticker"].map(FULL_NAME_MAP).fillna("")
     df["description"] = df["ticker"].map(DESCRIPTION_MAP).fillna("")
     df["sub_sector"]  = df["ticker"].map(SUB_SECTOR_MAP).fillna("")
+    df = enrich_metadata(df)
 
     if not etf_df.empty:
         etf_df = etf_df.copy()
         etf_df["full_name"]   = etf_df["ticker"].map(FULL_NAME_MAP).fillna("")
         etf_df["description"] = etf_df["ticker"].map(DESCRIPTION_MAP).fillna("")
         etf_df["sub_sector"]  = etf_df["ticker"].map(SUB_SECTOR_MAP).fillna("")
+        etf_df = enrich_metadata(etf_df)
 
     sector_counts = df["sector"].value_counts().to_dict()
     grade_counts = df["grade"].value_counts().to_dict()
