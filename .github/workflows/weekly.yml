@@ -8,10 +8,6 @@ on:
 jobs:
   run-and-email:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./momentum-dashboard
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
