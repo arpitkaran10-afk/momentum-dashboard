@@ -885,11 +885,19 @@ def score_and_rank(df, top_n=50):
     stocks_df = df[df["asset_type"] == "stock"] if "asset_type" in df.columns else df
     etf_df    = df[df["asset_type"] == "etf"]   if "asset_type" in df.columns else df.iloc[0:0]
 
+    # Drop any rows where the score couldn't be computed — never let None into the top 50
+    stocks_df = stocks_df.dropna(subset=["momentum_score"])
+    etf_df    = etf_df.dropna(subset=["momentum_score"])
+
     top_stocks = stocks_df.nlargest(top_n, "momentum_score").reset_index(drop=True)
     top_stocks.insert(0, "rank", range(1, len(top_stocks)+1))
 
     top_etfs = etf_df.nlargest(50, "momentum_score").reset_index(drop=True)
     top_etfs.insert(0, "rank", range(1, len(top_etfs)+1))
+
+    # Hard validation — pipeline should never produce None scores in output
+    assert top_stocks["momentum_score"].notna().all(), "BUG: None scores in top stocks"
+    assert top_etfs.empty or top_etfs["momentum_score"].notna().all(), "BUG: None scores in top ETFs"
 
     log.info(f"Top {top_n} stocks. Score: {top_stocks.momentum_score.min():.1f}–{top_stocks.momentum_score.max():.1f}")
     if not top_etfs.empty:
