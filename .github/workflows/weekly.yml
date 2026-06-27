@@ -1,0 +1,37 @@
+name: Weekly MomentumIQ Digest
+
+on:
+  schedule:
+    - cron: "30 3 * * 6"   # 3:30am UTC Saturday = 9:00am IST Saturday
+  workflow_dispatch:        # allows manual trigger from GitHub UI
+
+jobs:
+  run-and-email:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./momentum-dashboard
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run momentum pipeline
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python momentum_pipeline.py
+
+      - name: Send weekly email
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASS: ${{ secrets.GMAIL_APP_PASS }}
+        run: python send_weekly_email.py
