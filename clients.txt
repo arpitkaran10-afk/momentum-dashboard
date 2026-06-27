@@ -1,3 +1,5 @@
 # One email address per line. Lines starting with # are ignored.
 # client1@example.com
 # client2@example.com
+
+arpitkaran10@gmail.com
